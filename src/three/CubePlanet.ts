@@ -32,6 +32,7 @@ export class CubePlanet {
   private roverAnimation: AnimationState | null = null;
   private particles: ParticleSystem[] = [];
   private lastTime: number = 0;
+  private currentRoverFace: CubeFace = 4; // FRONT by default
 
   constructor(container: HTMLElement) {
     // Scene setup
@@ -111,8 +112,8 @@ export class CubePlanet {
     const deltaTime = this.lastTime > 0 ? currentTime - this.lastTime : 0;
     this.lastTime = currentTime;
 
-    // Note: Cube rotation removed to keep rover face visible
-    // The cube is now oriented to show the front face where the rover starts
+    // Update camera to follow rover smoothly
+    this.updateCameraForRover(this.currentRoverFace);
 
     // Update rover animation
     if (this.roverAnimation) {
@@ -288,55 +289,106 @@ export class CubePlanet {
    * Get rotation quaternion for rover direction on a face
    */
   private getRotationForDirection(face: CubeFace, direction: Direction): THREE.Quaternion {
+    // The rover is oriented with the cone pointing in +X direction (forward)
+    // We need to rotate it to point in the correct direction on each face
+    
     const quaternion = new THREE.Quaternion();
-    const euler = new THREE.Euler();
-
-    // Base orientation for each face
-    switch (face) {
-      case 0: // Right
-        euler.set(0, Math.PI / 2, 0);
-        break;
-      case 1: // Left
-        euler.set(0, -Math.PI / 2, 0);
-        break;
-      case 2: // Top
-        euler.set(-Math.PI / 2, 0, 0);
-        break;
-      case 3: // Bottom
-        euler.set(Math.PI / 2, 0, 0);
-        break;
-      case 4: // Front
-        euler.set(0, 0, 0);
-        break;
-      case 5: // Back
-        euler.set(0, Math.PI, 0);
-        break;
-    }
-
-    quaternion.setFromEuler(euler);
-
-    // Additional rotation based on direction
-    const dirRotation = new THREE.Quaternion();
-    const dirEuler = new THREE.Euler();
+    
+    // Direction vectors in local face coordinates (where Y is "up" on the face, X is "forward")
+    // N = -Y direction (top of grid), S = +Y (bottom), E = +X (right), W = -X (left)
+    let targetDir = new THREE.Vector3();
     
     switch (direction) {
-      case 'N':
-        dirEuler.set(0, 0, 0);
+      case 'N': // North = negative Y in grid = upward on face
+        targetDir.set(0, 1, 0); // Points up on the face
         break;
-      case 'E':
-        dirEuler.set(0, 0, -Math.PI / 2);
+      case 'S': // South = positive Y in grid = downward on face
+        targetDir.set(0, -1, 0); // Points down on the face
         break;
-      case 'S':
-        dirEuler.set(0, 0, Math.PI);
+      case 'E': // East = positive X in grid = right on face
+        targetDir.set(1, 0, 0); // Points right on the face
         break;
-      case 'W':
-        dirEuler.set(0, 0, Math.PI / 2);
+      case 'W': // West = negative X in grid = left on face
+        targetDir.set(-1, 0, 0); // Points left on the face
         break;
     }
-
-    dirRotation.setFromEuler(dirEuler);
-    quaternion.multiply(dirRotation);
-
+    
+    // Transform to world coordinates based on face and create rotation
+    let worldDir = new THREE.Vector3();
+    let worldUp = new THREE.Vector3();
+    
+    switch (face) {
+      case 0: // Right face (positive X)
+        // Face normal: +X, Up: +Y, Right: +Z
+        worldDir.set(
+          targetDir.z,           // Right on face -> +Z in world
+          targetDir.y,           // Up on face -> +Y in world
+          targetDir.x            // Forward on face -> local X mapped to Z
+        );
+        worldUp.set(0, 1, 0);
+        break;
+        
+      case 1: // Left face (negative X)
+        // Face normal: -X, Up: +Y, Right: -Z
+        worldDir.set(
+          -targetDir.z,          // Right on face -> -Z in world
+          targetDir.y,           // Up on face -> +Y in world
+          -targetDir.x           // Forward on face -> local X mapped to -Z
+        );
+        worldUp.set(0, 1, 0);
+        break;
+        
+      case 2: // Top face (positive Y)
+        // Face normal: +Y, Up: -Z, Right: +X
+        worldDir.set(
+          targetDir.x,           // Right on face -> +X in world
+          targetDir.z,           // Forward on face -> local Z
+          targetDir.y            // Up on face -> +Z in world
+        );
+        worldUp.set(0, 0, -1);
+        break;
+        
+      case 3: // Bottom face (negative Y)
+        // Face normal: -Y, Up: +Z, Right: +X
+        worldDir.set(
+          targetDir.x,           // Right on face -> +X in world
+          -targetDir.z,          // Forward on face -> -local Z
+          -targetDir.y           // Up on face -> -Z in world
+        );
+        worldUp.set(0, 0, 1);
+        break;
+        
+      case 4: // Front face (positive Z)
+        // Face normal: +Z, Up: +Y, Right: +X
+        worldDir.set(
+          targetDir.x,           // Right on face -> +X in world
+          targetDir.y,           // Up on face -> +Y in world
+          targetDir.z            // Forward on face -> local Z
+        );
+        worldUp.set(0, 1, 0);
+        break;
+        
+      case 5: // Back face (negative Z)
+        // Face normal: -Z, Up: +Y, Right: -X
+        worldDir.set(
+          -targetDir.x,          // Right on face -> -X in world
+          targetDir.y,           // Up on face -> +Y in world
+          -targetDir.z           // Forward on face -> -local Z
+        );
+        worldUp.set(0, 1, 0);
+        break;
+    }
+    
+    // Create matrix looking in worldDir direction with worldUp as up
+    const matrix = new THREE.Matrix4();
+    matrix.lookAt(new THREE.Vector3(0, 0, 0), worldDir, worldUp);
+    quaternion.setFromRotationMatrix(matrix);
+    
+    // Rotate 180 degrees around up axis because lookAt points away from target
+    const flip = new THREE.Quaternion();
+    flip.setFromAxisAngle(worldUp, Math.PI);
+    quaternion.multiply(flip);
+    
     return quaternion;
   }
 
@@ -381,35 +433,46 @@ export class CubePlanet {
 
     this.cube.add(this.roverGroup);
 
-    // Rotate cube to show the current face
-    this.rotateCubeToShowFace(face);
+    // Store current face and update camera
+    this.currentRoverFace = face;
+    this.updateCameraForRover(face);
   }
 
   /**
-   * Rotate cube to show the specified face towards the camera
+   * Update camera to follow the rover on the current face
    */
-  private rotateCubeToShowFace(face: CubeFace): void {
-    // Set cube rotation to show the specified face
+  private updateCameraForRover(face: CubeFace): void {
+    const distance = 4.5; // Distance from cube center
+    const height = 1.5;   // Height offset for better viewing angle
+    
+    let cameraPos = new THREE.Vector3();
+    let lookAtPos = new THREE.Vector3(0, 0, 0); // Look at cube center
+    
+    // Position camera based on which face the rover is on
     switch (face) {
-      case 0: // RIGHT - rotate to show right face
-        this.cube.rotation.set(0, Math.PI / 2, 0);
+      case 0: // RIGHT face
+        cameraPos.set(distance, height, 0);
         break;
-      case 1: // LEFT - rotate to show left face
-        this.cube.rotation.set(0, -Math.PI / 2, 0);
+      case 1: // LEFT face
+        cameraPos.set(-distance, height, 0);
         break;
-      case 2: // TOP - rotate to show top face
-        this.cube.rotation.set(-Math.PI / 2, 0, 0);
+      case 2: // TOP face
+        cameraPos.set(0, distance, -height);
         break;
-      case 3: // BOTTOM - rotate to show bottom face
-        this.cube.rotation.set(Math.PI / 2, 0, 0);
+      case 3: // BOTTOM face
+        cameraPos.set(0, -distance, height);
         break;
-      case 4: // FRONT - show front face (default view)
-        this.cube.rotation.set(0, 0, 0);
+      case 4: // FRONT face
+        cameraPos.set(0, height, distance);
         break;
-      case 5: // BACK - rotate to show back face
-        this.cube.rotation.set(0, Math.PI, 0);
+      case 5: // BACK face
+        cameraPos.set(0, height, -distance);
         break;
     }
+    
+    // Smoothly transition camera
+    this.camera.position.lerp(cameraPos, 0.1);
+    this.camera.lookAt(lookAtPos);
   }
 
   /**
@@ -432,10 +495,11 @@ export class CubePlanet {
     const startRot = this.roverGroup.quaternion.clone();
     const endRot = this.getRotationForDirection(face, direction);
 
-    // Check if face changed - if so, rotate cube to show new face
-    const currentFace = this.getCurrentRoverFace();
-    if (currentFace !== face) {
-      this.rotateCubeToShowFace(face);
+    // Check if face changed - if so, update camera and cube rotation
+    if (this.currentRoverFace !== face) {
+      this.currentRoverFace = face;
+      this.updateCameraForRover(face);
+      // Removed rotateCubeToShowFace to keep cube stable and camera moving
     }
 
     this.roverAnimation = {
@@ -447,26 +511,6 @@ export class CubePlanet {
       duration,
       onComplete
     };
-  }
-
-  /**
-   * Get current rover face based on position
-   */
-  private getCurrentRoverFace(): CubeFace | null {
-    if (!this.roverGroup) return null;
-    
-    const pos = this.roverGroup.position;
-    const threshold = 0.5;
-    
-    // Determine which face based on position
-    if (Math.abs(pos.x - 1.02) < threshold) return 0; // RIGHT
-    if (Math.abs(pos.x + 1.02) < threshold) return 1; // LEFT
-    if (Math.abs(pos.y - 1.02) < threshold) return 2; // TOP
-    if (Math.abs(pos.y + 1.02) < threshold) return 3; // BOTTOM
-    if (Math.abs(pos.z - 1.02) < threshold) return 4; // FRONT
-    if (Math.abs(pos.z + 1.02) < threshold) return 5; // BACK
-    
-    return 4; // Default to FRONT
   }
 
   /**
