@@ -296,7 +296,7 @@ export class CubePlanet {
     
     // Direction vectors in local face coordinates (where Y is "up" on the face, X is "forward")
     // N = -Y direction (top of grid), S = +Y (bottom), E = +X (right), W = -X (left)
-    let targetDir = new THREE.Vector3();
+    const targetDir = new THREE.Vector3();
     
     switch (direction) {
       case 'N': // North = negative Y in grid = upward on face
@@ -314,8 +314,8 @@ export class CubePlanet {
     }
     
     // Transform to world coordinates based on face and create rotation
-    let worldDir = new THREE.Vector3();
-    let worldUp = new THREE.Vector3();
+    const worldDir = new THREE.Vector3();
+    const worldUp = new THREE.Vector3();
     
     switch (face) {
       case 0: // Right face (positive X)
@@ -445,8 +445,8 @@ export class CubePlanet {
     const distance = 4.5; // Distance from cube center
     const height = 1.5;   // Height offset for better viewing angle
     
-    let cameraPos = new THREE.Vector3();
-    let lookAtPos = new THREE.Vector3(0, 0, 0); // Look at cube center
+    const cameraPos = new THREE.Vector3();
+    const lookAtPos = new THREE.Vector3(0, 0, 0); // Look at cube center
     
     // Position camera based on which face the rover is on
     switch (face) {
