@@ -6,7 +6,14 @@ vi.mock('three', async () => {
   const actual = await vi.importActual('three');
   return {
     ...actual,
-    WebGLRenderer: vi.fn(function(this: any) {
+    WebGLRenderer: vi.fn(function(this: {
+      domElement: HTMLCanvasElement;
+      setSize: ReturnType<typeof vi.fn>;
+      render: ReturnType<typeof vi.fn>;
+      dispose: ReturnType<typeof vi.fn>;
+      setPixelRatio: ReturnType<typeof vi.fn>;
+      setClearColor: ReturnType<typeof vi.fn>;
+    }) {
       this.domElement = document.createElement('canvas');
       this.setSize = vi.fn();
       this.render = vi.fn();
