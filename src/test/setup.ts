@@ -27,7 +27,7 @@ HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
   transform: vi.fn(),
   rect: vi.fn(),
   clip: vi.fn(),
-})) as any;
+})) as unknown as typeof HTMLCanvasElement.prototype.getContext;
 
 // Mock requestAnimationFrame
 globalThis.requestAnimationFrame = vi.fn((cb) => {
