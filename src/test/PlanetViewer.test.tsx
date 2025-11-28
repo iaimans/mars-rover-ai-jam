@@ -4,17 +4,17 @@ import { PlanetViewer } from '../components/PlanetViewer';
 
 // Mock CubePlanet to avoid Three.js WebGL context issues in tests
 vi.mock('../three/CubePlanet', () => ({
-  CubePlanet: vi.fn().mockImplementation(() => ({
-    animate: vi.fn(),
-    dispose: vi.fn(),
-    setObstacles: vi.fn(),
-    initializeRover: vi.fn(),
-    animateRoverTo: vi.fn((_face, _x, _y, _dir, _duration, onComplete) => {
+  CubePlanet: class MockCubePlanet {
+    animate = vi.fn();
+    dispose = vi.fn();
+    setObstacles = vi.fn();
+    initializeRover = vi.fn();
+    animateRoverTo = vi.fn((_face, _x, _y, _dir, _duration, onComplete) => {
       // Simulate immediate completion for tests
       setTimeout(onComplete, 0);
-    }),
-    spawnCollisionParticles: vi.fn()
-  }))
+    });
+    spawnCollisionParticles = vi.fn();
+  }
 }));
 
 describe('PlanetViewer', () => {
@@ -50,10 +50,14 @@ describe('PlanetViewer', () => {
   });
 
   it('displays initial rover position as Front face at (5,5) facing N', () => {
-    render(<PlanetViewer />);
+    const { container } = render(<PlanetViewer />);
     expect(screen.getByText(/Front/i)).toBeInTheDocument();
     expect(screen.getByText(/\(5, 5\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/N/i)).toBeInTheDocument();
+    
+    // Check the rover status section for direction N
+    const roverStatus = container.querySelector('.rover-status');
+    expect(roverStatus?.textContent).toContain('Direction:');
+    expect(roverStatus?.textContent).toContain('N');
   });
 
   it('does not display collision warning initially', () => {
