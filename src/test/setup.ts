@@ -18,7 +18,7 @@ vi.mock('three', async () => {
 });
 
 // Mock requestAnimationFrame
-globalThis.requestAnimationFrame = vi.fn((cb) => {
+globalThis.requestAnimationFrame = vi.fn(() => {
   // Don't call the callback to avoid infinite loops in tests
   return 1;
 });
