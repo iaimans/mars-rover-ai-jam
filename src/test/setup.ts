@@ -1,38 +1,26 @@
 import '@testing-library/jest-dom';
 import { vi } from 'vitest';
 
-// Mock HTMLCanvasElement.getContext for Three.js
-HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
-  fillRect: vi.fn(),
-  clearRect: vi.fn(),
-  getImageData: vi.fn(),
-  putImageData: vi.fn(),
-  createImageData: vi.fn(),
-  setTransform: vi.fn(),
-  drawImage: vi.fn(),
-  save: vi.fn(),
-  fillText: vi.fn(),
-  restore: vi.fn(),
-  beginPath: vi.fn(),
-  moveTo: vi.fn(),
-  lineTo: vi.fn(),
-  closePath: vi.fn(),
-  stroke: vi.fn(),
-  translate: vi.fn(),
-  scale: vi.fn(),
-  rotate: vi.fn(),
-  arc: vi.fn(),
-  fill: vi.fn(),
-  measureText: vi.fn(() => ({ width: 0 })),
-  transform: vi.fn(),
-  rect: vi.fn(),
-  clip: vi.fn(),
-})) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+// Mock Three.js WebGLRenderer to avoid WebGL context issues in tests
+vi.mock('three', async () => {
+  const actual = await vi.importActual('three');
+  return {
+    ...actual,
+    WebGLRenderer: vi.fn(function(this: any) {
+      this.domElement = document.createElement('canvas');
+      this.setSize = vi.fn();
+      this.render = vi.fn();
+      this.dispose = vi.fn();
+      this.setPixelRatio = vi.fn();
+      this.setClearColor = vi.fn();
+    }),
+  };
+});
 
 // Mock requestAnimationFrame
 globalThis.requestAnimationFrame = vi.fn((cb) => {
-  cb(0);
-  return 0;
+  // Don't call the callback to avoid infinite loops in tests
+  return 1;
 });
 
 globalThis.cancelAnimationFrame = vi.fn();
